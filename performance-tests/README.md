@@ -34,6 +34,11 @@ performance-tests/
 - **Listar órdenes** (6x): Consulta frecuente
 - **Crear orden completa** (2x): Flujo complejo (user → cart → order)
 
+### Favourite Service (Peso 14)
+- **Listar favoritos** (7x): Consulta muy frecuente
+- **Crear favorito** (4x): Operación de escritura
+- **Obtener favorito por ID** (3x): Consulta individual con ID compuesto
+
 ---
 
 ##  Cómo Ejecutar Localmente

@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 
 # Base URL del API Gateway (se configurará desde variable de entorno o CLI)
-HOST = "http://20.15.17.8:8080"
+HOST = "http://130.213.180.94:8080"
 
 
 class EcommerceUser(HttpUser):
@@ -23,6 +23,8 @@ class EcommerceUser(HttpUser):
         self.category_ids = []
         self.cart_id = None
         self.order_id = None
+        self.favourite_user_ids = []
+        self.favourite_product_ids = []
         
         # Intentar obtener IDs existentes (para evitar crear demasiados)
         self._load_existing_ids()
@@ -36,6 +38,7 @@ class EcommerceUser(HttpUser):
                 data = response.json()
                 if 'collection' in data and len(data['collection']) > 0:
                     self.product_ids = [p['productId'] for p in data['collection'][:10]]
+                    self.favourite_product_ids = self.product_ids.copy()
             
             # Obtener algunas categorías existentes
             response = self.client.get("/product-service/api/categories", name="GET Categories List")
@@ -43,6 +46,13 @@ class EcommerceUser(HttpUser):
                 data = response.json()
                 if 'collection' in data and len(data['collection']) > 0:
                     self.category_ids = [c['categoryId'] for c in data['collection'][:5]]
+            
+            # Obtener algunos usuarios existentes para favourites
+            response = self.client.get("/user-service/api/users", name="GET Users List")
+            if response.status_code == 200:
+                data = response.json()
+                if 'collection' in data and len(data['collection']) > 0:
+                    self.favourite_user_ids = [u['userId'] for u in data['collection'][:10]]
         except Exception as e:
             print(f"⚠️ Error cargando IDs existentes: {e}")
     
@@ -252,4 +262,79 @@ class EcommerceUser(HttpUser):
                 response.success()
             else:
                 response.failure(f"Status code: {response.status_code}")
+    
+    # ==================== FAVOURITE SERVICE ====================
+    
+    @task(7)  # Peso 7: muy frecuente
+    def list_favourites(self):
+        """Listar favoritos - operación común"""
+        with self.client.get(
+            "/favourite-service/api/favourites",
+            name="GET Favourites List",
+            catch_response=True
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"Status code: {response.status_code}")
+    
+    @task(4)  # Peso 4: frecuente
+    def create_favourite(self):
+        """Crear nuevo favorito"""
+        if not self.favourite_user_ids or not self.favourite_product_ids:
+            return
+        
+        # Generar fecha en formato requerido: dd-MM-yyyy__HH:mm:ss:SSSSSS
+        now = datetime.now()
+        like_date = now.strftime("%d-%m-%Y__%H:%M:%S:") + str(now.microsecond).zfill(6)
+        
+        favourite_data = {
+            "userId": random.choice(self.favourite_user_ids),
+            "productId": random.choice(self.favourite_product_ids),
+            "likeDate": like_date
+        }
+        
+        with self.client.post(
+            "/favourite-service/api/favourites",
+            json=favourite_data,
+            name="POST Create Favourite",
+            catch_response=True
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"Status code: {response.status_code}")
+    
+    @task(3)  # Peso 3: moderado
+    def get_favourite_by_id(self):
+        """Obtener favorito por ID compuesto"""
+        # Para obtener un favourito necesitamos userId, productId y likeDate
+        # Como es complejo, intentamos obtener uno de la lista primero
+        try:
+            response = self.client.get(
+                "/favourite-service/api/favourites",
+                name="GET Favourites List (for ID)"
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if 'collection' in data and len(data['collection']) > 0:
+                    favourite = random.choice(data['collection'])
+                    user_id = favourite.get('userId')
+                    product_id = favourite.get('productId')
+                    like_date = favourite.get('likeDate')
+                    
+                    if user_id and product_id and like_date:
+                        # Hacer request con el ID compuesto
+                        with self.client.get(
+                            f"/favourite-service/api/favourites/{user_id}/{product_id}/{like_date}",
+                            name="GET Favourite by ID",
+                            catch_response=True
+                        ) as fav_response:
+                            if fav_response.status_code == 200:
+                                fav_response.success()
+                            else:
+                                fav_response.failure(f"Status code: {fav_response.status_code}")
+        except Exception as e:
+            # Si falla, simplemente retornar sin hacer nada
+            pass
 

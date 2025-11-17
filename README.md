@@ -1,4 +1,4 @@
-# API Gateway
+# API Gateway.
 
 ##  Descripción
 

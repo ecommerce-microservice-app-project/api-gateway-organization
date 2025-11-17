@@ -44,6 +44,11 @@ performance-tests/
 - **Crear pago** (4x): Operación de escritura
 - **Obtener pago por ID** (3x): Consulta individual
 
+### Shipping Service (Peso 14)
+- **Listar orderItems (shipping)** (7x): Consulta muy frecuente
+- **Crear orderItem (shipping)** (4x): Operación de escritura
+- **Obtener orderItem por ID compuesto** (3x): Consulta individual con clave compuesta (orderId, productId)
+
 ---
 
 ##  Cómo Ejecutar Localmente

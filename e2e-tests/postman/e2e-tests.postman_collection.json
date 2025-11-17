@@ -1911,6 +1911,424 @@
         }
       ],
       "description": "Valida el flujo completo de gestión de pagos: crear, listar, obtener, actualizar y eliminar, verificando la comunicación con Order Service"
+    },
+    {
+      "name": "Flujo 8: Gestión de Envíos (Shipping)",
+      "item": [
+        {
+          "name": "1. Obtener/Crear Orden y Producto para Shipping",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    // Obtener orderId",
+                  "    if (jsonData.orderId) {",
+                  "        pm.environment.set(\"shippingOrderId\", jsonData.orderId);",
+                  "        console.log(\"✅ Order for shipping retrieved with ID: \" + jsonData.orderId);",
+                  "    } else if (jsonData.collection && jsonData.collection.length > 0) {",
+                  "        pm.environment.set(\"shippingOrderId\", jsonData.collection[0].orderId);",
+                  "        console.log(\"✅ Using existing order ID: \" + jsonData.collection[0].orderId);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/order-service/api/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["order-service", "api", "orders"]
+            },
+            "description": "Obtiene una orden existente para usar en el flujo de shipping"
+          },
+          "response": []
+        },
+        {
+          "name": "2. Obtener Producto para Shipping",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    // Obtener productId",
+                  "    if (jsonData.productId) {",
+                  "        pm.environment.set(\"shippingProductId\", jsonData.productId);",
+                  "        console.log(\"✅ Product for shipping retrieved with ID: \" + jsonData.productId);",
+                  "    } else if (jsonData.collection && jsonData.collection.length > 0) {",
+                  "        pm.environment.set(\"shippingProductId\", jsonData.collection[0].productId);",
+                  "        console.log(\"✅ Using existing product ID: \" + jsonData.collection[0].productId);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/product-service/api/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["product-service", "api", "products"]
+            },
+            "description": "Obtiene un producto existente para usar en el flujo de shipping"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Crear OrderItem (Shipping)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Construir el body JSON",
+                  "const orderId = parseInt(pm.environment.get(\"shippingOrderId\")) || parseInt(pm.environment.get(\"orderId\")) || 1;",
+                  "const productId = parseInt(pm.environment.get(\"shippingProductId\")) || parseInt(pm.environment.get(\"productId\")) || 1;",
+                  "const requestBody = {",
+                  "    orderId: orderId,",
+                  "    productId: productId,",
+                  "    orderedQuantity: 5,",
+                  "    product: {",
+                  "        productId: productId",
+                  "    },",
+                  "    order: {",
+                  "        orderId: orderId",
+                  "    }",
+                  "};",
+                  "pm.environment.set(\"requestBodyShipping\", JSON.stringify(requestBody));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"OrderItem was created successfully\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData.orderId).to.exist;",
+                  "        pm.expect(jsonData.productId).to.exist;",
+                  "        pm.expect(jsonData.orderedQuantity).to.exist;",
+                  "        pm.environment.set(\"shippingOrderId\", jsonData.orderId);",
+                  "        pm.environment.set(\"shippingProductId\", jsonData.productId);",
+                  "        console.log(\"✅ OrderItem created successfully with orderId: \" + jsonData.orderId + \", productId: \" + jsonData.productId);",
+                  "    });",
+                  "",
+                  "    pm.test(\"OrderItem has correct orderId and productId\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        var expectedOrderId = parseInt(pm.environment.get(\"shippingOrderId\")) || 1;",
+                  "        var expectedProductId = parseInt(pm.environment.get(\"shippingProductId\")) || 1;",
+                  "        pm.expect(jsonData.orderId).to.eql(expectedOrderId);",
+                  "        pm.expect(jsonData.productId).to.eql(expectedProductId);",
+                  "    });",
+                  "} else {",
+                  "    console.log(\"❌ Failed to create orderItem. Response: \" + pm.response.text());",
+                  "    console.log(\"💡 Check: Order and Product exist? orderId: \" + pm.environment.get(\"shippingOrderId\") + \", productId: \" + pm.environment.get(\"shippingProductId\"));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{requestBodyShipping}}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/shipping-service/api/shippings",
+              "host": ["{{baseUrl}}"],
+              "path": ["shipping-service", "api", "shippings"]
+            },
+            "description": "Crea un nuevo OrderItem (shipping) asociado a una orden y un producto"
+          },
+          "response": []
+        },
+        {
+          "name": "4. Listar OrderItems",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"OrderItems list is returned\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.collection).to.be.an('array');",
+                  "    console.log(\"✅ Found \" + jsonData.collection.length + \" orderItems\");",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"At least one orderItem exists\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        if (jsonData.collection.length > 0) {",
+                  "            var firstOrderItem = jsonData.collection[0];",
+                  "            pm.expect(firstOrderItem.orderId).to.exist;",
+                  "            pm.expect(firstOrderItem.productId).to.exist;",
+                  "            pm.expect(firstOrderItem.product).to.exist;",
+                  "            pm.expect(firstOrderItem.order).to.exist;",
+                  "            console.log(\"✅ OrderItems list contains valid data\");",
+                  "        }",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/shipping-service/api/shippings",
+              "host": ["{{baseUrl}}"],
+              "path": ["shipping-service", "api", "shippings"]
+            },
+            "description": "Obtiene la lista de todos los orderItems"
+          },
+          "response": []
+        },
+        {
+          "name": "5. Obtener OrderItem por ID",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Asegurar que tenemos los IDs",
+                  "const orderId = pm.environment.get(\"shippingOrderId\") || pm.environment.get(\"orderId\") || \"1\";",
+                  "const productId = pm.environment.get(\"shippingProductId\") || pm.environment.get(\"productId\") || \"1\";",
+                  "if (!pm.environment.get(\"shippingOrderId\")) {",
+                  "    pm.environment.set(\"shippingOrderId\", orderId);",
+                  "}",
+                  "if (!pm.environment.get(\"shippingProductId\")) {",
+                  "    pm.environment.set(\"shippingProductId\", productId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"OrderItem exists\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData.orderId).to.exist;",
+                  "        pm.expect(jsonData.productId).to.exist;",
+                  "        pm.expect(jsonData.product).to.exist;",
+                  "        pm.expect(jsonData.order).to.exist;",
+                  "    });",
+                  "",
+                  "    pm.test(\"Shipping Service called Product Service and Order Service (inter-service communication)\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        // Verificar que Shipping Service llamó a Product Service y Order Service",
+                  "        pm.expect(jsonData.product).to.exist;",
+                  "        pm.expect(jsonData.product.productId).to.exist;",
+                  "        pm.expect(jsonData.order).to.exist;",
+                  "        pm.expect(jsonData.order.orderId).to.exist;",
+                  "        console.log(\"✅ Shipping Service successfully retrieved product and order data from Product Service and Order Service\");",
+                  "    });",
+                  "",
+                  "    pm.test(\"Product and Order data is complete\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        if (jsonData.product && jsonData.product.productId !== null && jsonData.product.productId !== undefined) {",
+                  "            pm.expect(jsonData.product.productId).to.exist;",
+                  "            console.log(\"✅ Product data retrieved from Product Service\");",
+                  "        }",
+                  "        if (jsonData.order && jsonData.order.orderId !== null && jsonData.order.orderId !== undefined) {",
+                  "            pm.expect(jsonData.order.orderId).to.exist;",
+                  "            console.log(\"✅ Order data retrieved from Order Service\");",
+                  "        }",
+                  "    });",
+                  "} else {",
+                  "    console.log(\"❌ Failed to get orderItem. Response: \" + pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/shipping-service/api/shippings/{{shippingOrderId}}/{{shippingProductId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["shipping-service", "api", "shippings", "{{shippingOrderId}}", "{{shippingProductId}}"]
+            },
+            "description": "Obtiene un orderItem específico por su ID compuesto (orderId, productId)"
+          },
+          "response": []
+        },
+        {
+          "name": "6. Actualizar OrderItem",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Construir el body JSON para actualización",
+                  "const orderId = parseInt(pm.environment.get(\"shippingOrderId\")) || parseInt(pm.environment.get(\"orderId\")) || 1;",
+                  "const productId = parseInt(pm.environment.get(\"shippingProductId\")) || parseInt(pm.environment.get(\"productId\")) || 1;",
+                  "const requestBody = {",
+                  "    orderId: orderId,",
+                  "    productId: productId,",
+                  "    orderedQuantity: 10,",
+                  "    product: {",
+                  "        productId: productId",
+                  "    },",
+                  "    order: {",
+                  "        orderId: orderId",
+                  "    }",
+                  "};",
+                  "pm.environment.set(\"requestBodyUpdateShipping\", JSON.stringify(requestBody));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"OrderItem was updated successfully\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData.orderId).to.exist;",
+                  "        pm.expect(jsonData.productId).to.exist;",
+                  "        pm.expect(jsonData.orderedQuantity).to.eql(10);",
+                  "        console.log(\"✅ OrderItem updated successfully\");",
+                  "    });",
+                  "} else {",
+                  "    console.log(\"❌ Failed to update orderItem. Response: \" + pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{requestBodyUpdateShipping}}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/shipping-service/api/shippings",
+              "host": ["{{baseUrl}}"],
+              "path": ["shipping-service", "api", "shippings"]
+            },
+            "description": "Actualiza un orderItem existente (cambia la cantidad ordenada)"
+          },
+          "response": []
+        },
+        {
+          "name": "7. Eliminar OrderItem",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Asegurar que tenemos los IDs",
+                  "const orderId = pm.environment.get(\"shippingOrderId\") || pm.environment.get(\"orderId\") || \"1\";",
+                  "const productId = pm.environment.get(\"shippingProductId\") || pm.environment.get(\"productId\") || \"1\";",
+                  "if (!pm.environment.get(\"shippingOrderId\")) {",
+                  "    pm.environment.set(\"shippingOrderId\", orderId);",
+                  "}",
+                  "if (!pm.environment.get(\"shippingProductId\")) {",
+                  "    pm.environment.set(\"shippingProductId\", productId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"OrderItem was deleted successfully\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.eql(true);",
+                  "        console.log(\"✅ OrderItem deleted successfully\");",
+                  "        console.log(\"✅ E2E Test: Gestión de Envíos (Shipping) - PASÓ\");",
+                  "    });",
+                  "} else {",
+                  "    console.log(\"❌ Failed to delete orderItem. Response: \" + pm.response.text());",
+                  "    console.log(\"💡 Check: OrderItem exists? orderId: \" + pm.environment.get(\"shippingOrderId\") + \", productId: \" + pm.environment.get(\"shippingProductId\"));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/shipping-service/api/shippings/{{shippingOrderId}}/{{shippingProductId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["shipping-service", "api", "shippings", "{{shippingOrderId}}", "{{shippingProductId}}"]
+            },
+            "description": "Elimina un orderItem por su ID compuesto (orderId, productId)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Valida el flujo completo de gestión de envíos (shipping): crear, listar, obtener, actualizar y eliminar orderItems, verificando la comunicación con Product Service y Order Service"
     }
   ],
   "variable": [

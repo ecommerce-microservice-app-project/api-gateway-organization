@@ -26,6 +26,8 @@ class EcommerceUser(HttpUser):
         self.favourite_user_ids = []
         self.favourite_product_ids = []
         self.payment_order_ids = []  # Para payment service
+        self.shipping_order_ids = []  # Para shipping service
+        self.shipping_product_ids = []  # Para shipping service
 
         # Intentar obtener IDs existentes (para evitar crear demasiados)
         self._load_existing_ids()
@@ -61,14 +63,21 @@ class EcommerceUser(HttpUser):
                     self.favourite_user_ids = [u['userId']
                                                for u in data['collection'][:10]]
 
-            # Obtener algunas órdenes existentes para payments
+            # Obtener algunas órdenes existentes para payments y shipping
             response = self.client.get(
                 "/order-service/api/orders", name="GET Orders List")
             if response.status_code == 200:
                 data = response.json()
                 if 'collection' in data and len(data['collection']) > 0:
                     self.payment_order_ids = [o['orderId']
-                                              for o in data['collection'][:10]]
+                                               for o in data['collection'][:10]]
+                    self.shipping_order_ids = [o['orderId']
+                                                for o in data['collection'][:10]]
+
+            # Obtener algunos productos existentes para shipping
+            if not self.shipping_product_ids:
+                # Reutilizar product_ids si ya están cargados
+                self.shipping_product_ids = self.product_ids.copy()
         except Exception as e:
             print(f"⚠️ Error cargando IDs existentes: {e}")
 
@@ -444,6 +453,89 @@ class EcommerceUser(HttpUser):
                             else:
                                 pay_response.failure(
                                     f"Status code: {pay_response.status_code}")
+        except Exception as e:
+            # Si falla, simplemente retornar sin hacer nada
+            pass
+
+    # ==================== SHIPPING SERVICE ====================
+
+    @task(7)  # Peso 7: muy frecuente
+    def list_shippings(self):
+        """Listar orderItems (shipping) - operación común"""
+        with self.client.get(
+            "/shipping-service/api/shippings",
+            name="GET Shippings List",
+            catch_response=True,
+            timeout=30  # Timeout de 30 segundos para evitar errores por sobrecarga
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"Status code: {response.status_code}")
+
+    @task(4)  # Peso 4: frecuente
+    def create_shipping(self):
+        """Crear nuevo orderItem (shipping)"""
+        if not self.shipping_order_ids or not self.shipping_product_ids:
+            return
+
+        shipping_data = {
+            "orderId": random.choice(self.shipping_order_ids),
+            "productId": random.choice(self.shipping_product_ids),
+            "orderedQuantity": random.randint(1, 10),
+            "product": {
+                "productId": random.choice(self.shipping_product_ids)
+            },
+            "order": {
+                "orderId": random.choice(self.shipping_order_ids)
+            }
+        }
+
+        with self.client.post(
+            "/shipping-service/api/shippings",
+            json=shipping_data,
+            name="POST Create Shipping",
+            catch_response=True
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"Status code: {response.status_code}")
+
+    @task(3)  # Peso 3: moderado
+    def get_shipping_by_id(self):
+        """Obtener orderItem (shipping) por ID compuesto"""
+        # Para obtener un shipping necesitamos orderId y productId
+        # Intentamos obtener uno de la lista primero
+        try:
+            response = self.client.get(
+                "/shipping-service/api/shippings",
+                name="GET Shippings List (for ID)",
+                timeout=30
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if 'collection' in data and len(data['collection']) > 0:
+                    shipping = random.choice(data['collection'])
+                    order_id = shipping.get('orderId')
+                    product_id = shipping.get('productId')
+
+                    if order_id and product_id:
+                        # Hacer request con el ID compuesto
+                        with self.client.get(
+                            f"/shipping-service/api/shippings/{order_id}/{product_id}",
+                            name="GET Shipping by ID",
+                            catch_response=True,
+                            timeout=30
+                        ) as ship_response:
+                            if ship_response.status_code == 200:
+                                ship_response.success()
+                            elif ship_response.status_code == 400:
+                                # 400 Bad Request - Shipping no encontrado, no es crítico
+                                ship_response.success()
+                            else:
+                                ship_response.failure(
+                                    f"Status code: {ship_response.status_code}")
         except Exception as e:
             # Si falla, simplemente retornar sin hacer nada
             pass

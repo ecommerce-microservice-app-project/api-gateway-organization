@@ -39,6 +39,11 @@ performance-tests/
 - **Crear favorito** (4x): Operación de escritura
 - **Obtener favorito por ID** (3x): Consulta individual con ID compuesto
 
+### Payment Service (Peso 14)
+- **Listar pagos** (7x): Consulta muy frecuente
+- **Crear pago** (4x): Operación de escritura
+- **Obtener pago por ID** (3x): Consulta individual
+
 ---
 
 ##  Cómo Ejecutar Localmente

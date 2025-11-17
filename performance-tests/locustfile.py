@@ -13,9 +13,9 @@ HOST = "http://130.213.180.94:8080"
 
 class EcommerceUser(HttpUser):
     """Usuario simulado que interactúa con el sistema e-commerce"""
-    
+
     wait_time = between(1, 3)  # Espera entre 1 y 3 segundos entre requests
-    
+
     def on_start(self):
         """Se ejecuta al inicio de cada usuario simulado"""
         self.user_id = None
@@ -25,39 +25,55 @@ class EcommerceUser(HttpUser):
         self.order_id = None
         self.favourite_user_ids = []
         self.favourite_product_ids = []
-        
+        self.payment_order_ids = []  # Para payment service
+
         # Intentar obtener IDs existentes (para evitar crear demasiados)
         self._load_existing_ids()
-    
+
     def _load_existing_ids(self):
         """Cargar IDs existentes de productos y categorías"""
         try:
             # Obtener algunos productos existentes
-            response = self.client.get("/product-service/api/products", name="GET Products List")
+            response = self.client.get(
+                "/product-service/api/products", name="GET Products List")
             if response.status_code == 200:
                 data = response.json()
                 if 'collection' in data and len(data['collection']) > 0:
-                    self.product_ids = [p['productId'] for p in data['collection'][:10]]
+                    self.product_ids = [p['productId']
+                                        for p in data['collection'][:10]]
                     self.favourite_product_ids = self.product_ids.copy()
-            
+
             # Obtener algunas categorías existentes
-            response = self.client.get("/product-service/api/categories", name="GET Categories List")
+            response = self.client.get(
+                "/product-service/api/categories", name="GET Categories List")
             if response.status_code == 200:
                 data = response.json()
                 if 'collection' in data and len(data['collection']) > 0:
-                    self.category_ids = [c['categoryId'] for c in data['collection'][:5]]
-            
+                    self.category_ids = [c['categoryId']
+                                         for c in data['collection'][:5]]
+
             # Obtener algunos usuarios existentes para favourites
-            response = self.client.get("/user-service/api/users", name="GET Users List")
+            response = self.client.get(
+                "/user-service/api/users", name="GET Users List")
             if response.status_code == 200:
                 data = response.json()
                 if 'collection' in data and len(data['collection']) > 0:
-                    self.favourite_user_ids = [u['userId'] for u in data['collection'][:10]]
+                    self.favourite_user_ids = [u['userId']
+                                               for u in data['collection'][:10]]
+
+            # Obtener algunas órdenes existentes para payments
+            response = self.client.get(
+                "/order-service/api/orders", name="GET Orders List")
+            if response.status_code == 200:
+                data = response.json()
+                if 'collection' in data and len(data['collection']) > 0:
+                    self.payment_order_ids = [o['orderId']
+                                              for o in data['collection'][:10]]
         except Exception as e:
             print(f"⚠️ Error cargando IDs existentes: {e}")
-    
+
     # ==================== PRODUCT SERVICE ====================
-    
+
     @task(10)  # Peso 10: muy frecuente
     def list_products(self):
         """Listar productos - operación más común"""
@@ -70,13 +86,13 @@ class EcommerceUser(HttpUser):
                 response.success()
             else:
                 response.failure(f"Status code: {response.status_code}")
-    
+
     @task(5)  # Peso 5: frecuente
     def get_product_by_id(self):
         """Obtener producto por ID"""
         if not self.product_ids:
             return
-        
+
         product_id = random.choice(self.product_ids)
         with self.client.get(
             f"/product-service/api/products/{product_id}",
@@ -87,7 +103,7 @@ class EcommerceUser(HttpUser):
                 response.success()
             else:
                 response.failure(f"Status code: {response.status_code}")
-    
+
     @task(3)  # Peso 3: moderado
     def list_categories(self):
         """Listar categorías"""
@@ -100,13 +116,13 @@ class EcommerceUser(HttpUser):
                 response.success()
             else:
                 response.failure(f"Status code: {response.status_code}")
-    
+
     @task(2)  # Peso 2: menos frecuente
     def create_product(self):
         """Crear nuevo producto"""
         if not self.category_ids:
             return
-        
+
         # Generar datos únicos para evitar duplicados
         timestamp = int(datetime.now().timestamp() * 1000)
         product_data = {
@@ -119,7 +135,7 @@ class EcommerceUser(HttpUser):
                 "categoryId": random.choice(self.category_ids)
             }
         }
-        
+
         with self.client.post(
             "/product-service/api/products",
             json=product_data,
@@ -133,9 +149,9 @@ class EcommerceUser(HttpUser):
                 response.success()
             else:
                 response.failure(f"Status code: {response.status_code}")
-    
+
     # ==================== USER SERVICE ====================
-    
+
     @task(8)  # Peso 8: muy frecuente
     def list_users(self):
         """Listar usuarios"""
@@ -148,7 +164,7 @@ class EcommerceUser(HttpUser):
                 response.success()
             else:
                 response.failure(f"Status code: {response.status_code}")
-    
+
     @task(3)  # Peso 3: moderado
     def create_user(self):
         """Crear nuevo usuario"""
@@ -160,7 +176,7 @@ class EcommerceUser(HttpUser):
             "phone": f"+57-300-{random.randint(1000000, 9999999)}",
             "imageUrl": "https://bootdey.com/img/Content/avatar/avatar7.png"
         }
-        
+
         with self.client.post(
             "/user-service/api/users",
             json=user_data,
@@ -174,9 +190,9 @@ class EcommerceUser(HttpUser):
                 response.success()
             else:
                 response.failure(f"Status code: {response.status_code}")
-    
+
     # ==================== ORDER SERVICE ====================
-    
+
     @task(6)  # Peso 6: frecuente
     def list_orders(self):
         """Listar órdenes"""
@@ -189,7 +205,7 @@ class EcommerceUser(HttpUser):
                 response.success()
             else:
                 response.failure(f"Status code: {response.status_code}")
-    
+
     @task(2)  # Peso 2: menos frecuente (requiere cart y user)
     def create_order(self):
         """Crear orden completa (flujo de compra)"""
@@ -197,7 +213,7 @@ class EcommerceUser(HttpUser):
         # 1. Usuario
         # 2. Carrito
         # 3. Orden
-        
+
         if not self.user_id:
             # Intentar crear usuario primero
             timestamp = int(datetime.now().timestamp() * 1000)
@@ -208,19 +224,19 @@ class EcommerceUser(HttpUser):
                 "phone": f"+57-300-{random.randint(1000000, 9999999)}",
                 "imageUrl": "https://bootdey.com/img/Content/avatar/avatar7.png"
             }
-            
+
             user_response = self.client.post(
                 "/user-service/api/users",
                 json=user_data,
                 name="POST Create User (for Order)"
             )
-            
+
             if user_response.status_code != 200:
                 return
-            
+
             user_data = user_response.json()
             self.user_id = user_data.get('userId')
-        
+
         # Crear carrito
         cart_data = {"userId": self.user_id}
         cart_response = self.client.post(
@@ -228,17 +244,18 @@ class EcommerceUser(HttpUser):
             json=cart_data,
             name="POST Create Cart (for Order)"
         )
-        
+
         if cart_response.status_code != 200:
             return
-        
+
         cart_data = cart_response.json()
         self.cart_id = cart_data.get('cartId')
-        
+
         # Crear orden
         now = datetime.now()
-        order_date = now.strftime("%d-%m-%Y__%H:%M:%S:") + str(now.microsecond).zfill(6)
-        
+        order_date = now.strftime(
+            "%d-%m-%Y__%H:%M:%S:") + str(now.microsecond).zfill(6)
+
         order_data = {
             "orderDate": order_date,
             "orderDesc": "Performance Test Order",
@@ -248,7 +265,7 @@ class EcommerceUser(HttpUser):
                 "userId": self.user_id
             }
         }
-        
+
         with self.client.post(
             "/order-service/api/orders",
             json=order_data,
@@ -262,9 +279,9 @@ class EcommerceUser(HttpUser):
                 response.success()
             else:
                 response.failure(f"Status code: {response.status_code}")
-    
+
     # ==================== FAVOURITE SERVICE ====================
-    
+
     @task(7)  # Peso 7: muy frecuente
     def list_favourites(self):
         """Listar favoritos - operación común"""
@@ -277,23 +294,24 @@ class EcommerceUser(HttpUser):
                 response.success()
             else:
                 response.failure(f"Status code: {response.status_code}")
-    
+
     @task(4)  # Peso 4: frecuente
     def create_favourite(self):
         """Crear nuevo favorito"""
         if not self.favourite_user_ids or not self.favourite_product_ids:
             return
-        
+
         # Generar fecha en formato requerido: dd-MM-yyyy__HH:mm:ss:SSSSSS
         now = datetime.now()
-        like_date = now.strftime("%d-%m-%Y__%H:%M:%S:") + str(now.microsecond).zfill(6)
-        
+        like_date = now.strftime("%d-%m-%Y__%H:%M:%S:") + \
+            str(now.microsecond).zfill(6)
+
         favourite_data = {
             "userId": random.choice(self.favourite_user_ids),
             "productId": random.choice(self.favourite_product_ids),
             "likeDate": like_date
         }
-        
+
         with self.client.post(
             "/favourite-service/api/favourites",
             json=favourite_data,
@@ -304,7 +322,7 @@ class EcommerceUser(HttpUser):
                 response.success()
             else:
                 response.failure(f"Status code: {response.status_code}")
-    
+
     @task(3)  # Peso 3: moderado
     def get_favourite_by_id(self):
         """Obtener favorito por ID compuesto"""
@@ -322,7 +340,7 @@ class EcommerceUser(HttpUser):
                     user_id = favourite.get('userId')
                     product_id = favourite.get('productId')
                     like_date = favourite.get('likeDate')
-                    
+
                     if user_id and product_id and like_date:
                         # Hacer request con el ID compuesto
                         with self.client.get(
@@ -333,8 +351,80 @@ class EcommerceUser(HttpUser):
                             if fav_response.status_code == 200:
                                 fav_response.success()
                             else:
-                                fav_response.failure(f"Status code: {fav_response.status_code}")
+                                fav_response.failure(
+                                    f"Status code: {fav_response.status_code}")
         except Exception as e:
             # Si falla, simplemente retornar sin hacer nada
             pass
 
+    # ==================== PAYMENT SERVICE ====================
+
+    @task(7)  # Peso 7: muy frecuente
+    def list_payments(self):
+        """Listar pagos - operación común"""
+        with self.client.get(
+            "/payment-service/api/payments",
+            name="GET Payments List",
+            catch_response=True
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"Status code: {response.status_code}")
+
+    @task(4)  # Peso 4: frecuente
+    def create_payment(self):
+        """Crear nuevo pago"""
+        if not self.payment_order_ids:
+            return
+
+        payment_data = {
+            "isPayed": False,
+            "paymentStatus": "NOT_STARTED",
+            "order": {
+                "orderId": random.choice(self.payment_order_ids)
+            }
+        }
+
+        with self.client.post(
+            "/payment-service/api/payments",
+            json=payment_data,
+            name="POST Create Payment",
+            catch_response=True
+        ) as response:
+            if response.status_code == 200:
+                response.success()
+            else:
+                response.failure(f"Status code: {response.status_code}")
+
+    @task(3)  # Peso 3: moderado
+    def get_payment_by_id(self):
+        """Obtener pago por ID"""
+        # Para obtener un pago necesitamos paymentId
+        # Intentamos obtener uno de la lista primero
+        try:
+            response = self.client.get(
+                "/payment-service/api/payments",
+                name="GET Payments List (for ID)"
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if 'collection' in data and len(data['collection']) > 0:
+                    payment = random.choice(data['collection'])
+                    payment_id = payment.get('paymentId')
+
+                    if payment_id:
+                        # Hacer request con el ID
+                        with self.client.get(
+                            f"/payment-service/api/payments/{payment_id}",
+                            name="GET Payment by ID",
+                            catch_response=True
+                        ) as pay_response:
+                            if pay_response.status_code == 200:
+                                pay_response.success()
+                            else:
+                                pay_response.failure(
+                                    f"Status code: {pay_response.status_code}")
+        except Exception as e:
+            # Si falla, simplemente retornar sin hacer nada
+            pass

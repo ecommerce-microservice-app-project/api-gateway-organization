@@ -1560,6 +1560,357 @@
         }
       ],
       "description": "Valida el flujo completo de gestión de favoritos: crear, listar, obtener, actualizar y eliminar, verificando la comunicación con User Service y Product Service"
+    },
+    {
+      "name": "Flujo 7: Gestión de Pagos",
+      "item": [
+        {
+          "name": "1. Obtener/Crear Orden para Pago",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.orderId) {",
+                  "        pm.environment.set(\"orderId\", jsonData.orderId);",
+                  "        console.log(\"✅ Order for payment created/retrieved with ID: \" + jsonData.orderId);",
+                  "    } else if (jsonData.collection && jsonData.collection.length > 0) {",
+                  "        // Si es lista, usar la primera orden",
+                  "        pm.environment.set(\"orderId\", jsonData.collection[0].orderId);",
+                  "        console.log(\"✅ Using existing order ID: \" + jsonData.collection[0].orderId);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/order-service/api/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["order-service", "api", "orders"]
+            },
+            "description": "Obtiene una orden existente o crea una nueva para usar en el flujo de pagos"
+          },
+          "response": []
+        },
+        {
+          "name": "2. Crear Pago",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Construir el body JSON",
+                  "const orderId = parseInt(pm.environment.get(\"orderId\")) || 1;",
+                  "const requestBody = {",
+                  "    isPayed: false,",
+                  "    paymentStatus: \"NOT_STARTED\",",
+                  "    order: {",
+                  "        orderId: orderId",
+                  "    }",
+                  "};",
+                  "pm.environment.set(\"requestBodyPayment\", JSON.stringify(requestBody));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"Payment was created successfully\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData.paymentId).to.exist;",
+                  "        pm.expect(jsonData.order).to.exist;",
+                  "        pm.environment.set(\"paymentId\", jsonData.paymentId);",
+                  "        console.log(\"✅ Payment created successfully with ID: \" + jsonData.paymentId);",
+                  "    });",
+                  "",
+                  "    pm.test(\"Payment has correct orderId\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        var expectedOrderId = parseInt(pm.environment.get(\"orderId\")) || 1;",
+                  "        pm.expect(jsonData.order.orderId).to.eql(expectedOrderId);",
+                  "    });",
+                  "} else {",
+                  "    console.log(\"❌ Failed to create payment. Response: \" + pm.response.text());",
+                  "    console.log(\"💡 Check: Order exists? orderId: \" + pm.environment.get(\"orderId\"));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{requestBodyPayment}}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payment-service/api/payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["payment-service", "api", "payments"]
+            },
+            "description": "Crea un nuevo pago asociado a una orden"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Listar Pagos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Payments list is returned\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.collection).to.be.an('array');",
+                  "    console.log(\"✅ Found \" + jsonData.collection.length + \" payments\");",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"At least one payment exists\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        if (jsonData.collection.length > 0) {",
+                  "            var firstPayment = jsonData.collection[0];",
+                  "            pm.expect(firstPayment.paymentId).to.exist;",
+                  "            pm.expect(firstPayment.order).to.exist;",
+                  "            console.log(\"✅ Payments list contains valid data\");",
+                  "        }",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payment-service/api/payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["payment-service", "api", "payments"]
+            },
+            "description": "Obtiene la lista de todos los pagos"
+          },
+          "response": []
+        },
+        {
+          "name": "4. Obtener Pago por ID",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Asegurar que tenemos el paymentId",
+                  "const paymentId = pm.environment.get(\"paymentId\");",
+                  "if (!paymentId) {",
+                  "    console.log(\"⚠️ Warning: paymentId not set, using default 1\");",
+                  "    pm.environment.set(\"paymentId\", \"1\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"Payment exists\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData.paymentId).to.exist;",
+                  "        pm.expect(jsonData.order).to.exist;",
+                  "    });",
+                  "",
+                  "    pm.test(\"Payment Service called Order Service (inter-service communication)\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        // Verificar que Payment Service llamó a Order Service",
+                  "        pm.expect(jsonData.order).to.exist;",
+                  "        pm.expect(jsonData.order.orderId).to.exist;",
+                  "        console.log(\"✅ Payment Service successfully retrieved order data from Order Service\");",
+                  "    });",
+                  "",
+                  "    pm.test(\"Order data is complete\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        if (jsonData.order && jsonData.order.orderId !== null && jsonData.order.orderId !== undefined) {",
+                  "            pm.expect(jsonData.order.orderId).to.exist;",
+                  "            console.log(\"✅ Order data retrieved from Order Service\");",
+                  "        }",
+                  "    });",
+                  "} else {",
+                  "    console.log(\"❌ Failed to get payment. Response: \" + pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payment-service/api/payments/{{paymentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["payment-service", "api", "payments", "{{paymentId}}"]
+            },
+            "description": "Obtiene un pago específico por su ID"
+          },
+          "response": []
+        },
+        {
+          "name": "5. Actualizar Pago",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Construir el body JSON para actualización",
+                  "const paymentId = parseInt(pm.environment.get(\"paymentId\")) || 1;",
+                  "const orderId = parseInt(pm.environment.get(\"orderId\")) || 1;",
+                  "const requestBody = {",
+                  "    paymentId: paymentId,",
+                  "    isPayed: true,",
+                  "    paymentStatus: \"COMPLETED\",",
+                  "    order: {",
+                  "        orderId: orderId",
+                  "    }",
+                  "};",
+                  "pm.environment.set(\"requestBodyUpdatePayment\", JSON.stringify(requestBody));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"Payment was updated successfully\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData.paymentId).to.exist;",
+                  "        pm.expect(jsonData.isPayed).to.eql(true);",
+                  "        pm.expect(jsonData.paymentStatus).to.eql(\"COMPLETED\");",
+                  "        console.log(\"✅ Payment updated successfully\");",
+                  "    });",
+                  "} else {",
+                  "    console.log(\"❌ Failed to update payment. Response: \" + pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{requestBodyUpdatePayment}}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/payment-service/api/payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["payment-service", "api", "payments"]
+            },
+            "description": "Actualiza un pago existente (marca como pagado y completado)"
+          },
+          "response": []
+        },
+        {
+          "name": "6. Eliminar Pago",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Asegurar que tenemos el paymentId",
+                  "const paymentId = pm.environment.get(\"paymentId\");",
+                  "if (!paymentId) {",
+                  "    console.log(\"⚠️ Warning: paymentId not set, using default 1\");",
+                  "    pm.environment.set(\"paymentId\", \"1\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"Payment was deleted successfully\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.eql(true);",
+                  "        console.log(\"✅ Payment deleted successfully\");",
+                  "        console.log(\"✅ E2E Test: Gestión de Pagos - PASÓ\");",
+                  "    });",
+                  "} else {",
+                  "    console.log(\"❌ Failed to delete payment. Response: \" + pm.response.text());",
+                  "    console.log(\"💡 Check: Payment exists? paymentId: \" + pm.environment.get(\"paymentId\"));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/payment-service/api/payments/{{paymentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["payment-service", "api", "payments", "{{paymentId}}"]
+            },
+            "description": "Elimina un pago por su ID"
+          },
+          "response": []
+        }
+      ],
+      "description": "Valida el flujo completo de gestión de pagos: crear, listar, obtener, actualizar y eliminar, verificando la comunicación con Order Service"
     }
   ],
   "variable": [

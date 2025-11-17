@@ -37,6 +37,24 @@
       "value": "",
       "type": "default",
       "enabled": true
+    },
+    {
+      "key": "favouriteUserId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "favouriteProductId",
+      "value": "",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "favouriteLikeDate",
+      "value": "",
+      "type": "default",
+      "enabled": true
     }
   ],
   "_postman_variable_scope": "environment"

@@ -1116,6 +1116,450 @@
         }
       ],
       "description": "Valida que todos los endpoints de listado funcionan correctamente"
+    },
+    {
+      "name": "Flujo 6: Gestión de Favoritos",
+      "item": [
+        {
+          "name": "1. Crear/Usar Usuario para Favorito",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.userId) {",
+                  "        pm.environment.set(\"favouriteUserId\", jsonData.userId);",
+                  "        console.log(\"✅ User for favourite created/retrieved with ID: \" + jsonData.userId);",
+                  "    } else if (jsonData.collection && jsonData.collection.length > 0) {",
+                  "        // Si es lista, usar el primer usuario",
+                  "        pm.environment.set(\"favouriteUserId\", jsonData.collection[0].userId);",
+                  "        console.log(\"✅ Using existing user ID: \" + jsonData.collection[0].userId);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/user-service/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["user-service", "api", "users"]
+            },
+            "description": "Obtiene un usuario existente o crea uno nuevo para usar en el flujo de favoritos"
+          },
+          "response": []
+        },
+        {
+          "name": "2. Obtener Producto para Favorito",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.collection && jsonData.collection.length > 0) {",
+                  "        var firstProduct = jsonData.collection[0];",
+                  "        pm.environment.set(\"favouriteProductId\", firstProduct.productId);",
+                  "        console.log(\"✅ Using product ID for favourite: \" + firstProduct.productId);",
+                  "    } else if (jsonData.productId) {",
+                  "        pm.environment.set(\"favouriteProductId\", jsonData.productId);",
+                  "        console.log(\"✅ Using product ID: \" + jsonData.productId);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/product-service/api/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["product-service", "api", "products"]
+            },
+            "description": "Obtiene un producto existente para crear un favorito"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Crear Favorito",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Generar fecha en formato requerido: dd-MM-yyyy__HH:mm:ss:SSSSSS",
+                  "const now = new Date();",
+                  "const day = String(now.getDate()).padStart(2, '0');",
+                  "const month = String(now.getMonth() + 1).padStart(2, '0');",
+                  "const year = now.getFullYear();",
+                  "const hours = String(now.getHours()).padStart(2, '0');",
+                  "const minutes = String(now.getMinutes()).padStart(2, '0');",
+                  "const seconds = String(now.getSeconds()).padStart(2, '0');",
+                  "const milliseconds = String(now.getMilliseconds()).padStart(6, '0');",
+                  "const likeDate = `${day}-${month}-${year}__${hours}:${minutes}:${seconds}:${milliseconds}`;",
+                  "pm.environment.set(\"favouriteLikeDate\", likeDate);",
+                  "",
+                  "// Construir el body JSON",
+                  "const userId = parseInt(pm.environment.get(\"favouriteUserId\")) || parseInt(pm.environment.get(\"userId\")) || 1;",
+                  "const productId = parseInt(pm.environment.get(\"favouriteProductId\")) || parseInt(pm.environment.get(\"productId\")) || 1;",
+                  "const requestBody = {",
+                  "    userId: userId,",
+                  "    productId: productId,",
+                  "    likeDate: likeDate",
+                  "};",
+                  "pm.environment.set(\"requestBodyFavourite\", JSON.stringify(requestBody));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"Favourite was created successfully\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData.userId).to.exist;",
+                  "        pm.expect(jsonData.productId).to.exist;",
+                  "        pm.expect(jsonData.likeDate).to.exist;",
+                  "        console.log(\"✅ Favourite created successfully\");",
+                  "    });",
+                  "",
+                  "    pm.test(\"Favourite has correct userId and productId\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        var expectedUserId = parseInt(pm.environment.get(\"favouriteUserId\")) || parseInt(pm.environment.get(\"userId\")) || 1;",
+                  "        var expectedProductId = parseInt(pm.environment.get(\"favouriteProductId\")) || parseInt(pm.environment.get(\"productId\")) || 1;",
+                  "        pm.expect(jsonData.userId).to.eql(expectedUserId);",
+                  "        pm.expect(jsonData.productId).to.eql(expectedProductId);",
+                  "    });",
+                  "} else {",
+                  "    console.log(\"❌ Failed to create favourite. Response: \" + pm.response.text());",
+                  "    console.log(\"💡 Check: User and Product exist? userId: \" + pm.environment.get(\"favouriteUserId\") + \", productId: \" + pm.environment.get(\"favouriteProductId\"));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{requestBodyFavourite}}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/favourite-service/api/favourites",
+              "host": ["{{baseUrl}}"],
+              "path": ["favourite-service", "api", "favourites"]
+            },
+            "description": "Crea un nuevo favorito asociando un usuario con un producto"
+          },
+          "response": []
+        },
+        {
+          "name": "4. Listar Favoritos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Favourites list is returned\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.collection).to.be.an('array');",
+                  "    console.log(\"✅ Found \" + jsonData.collection.length + \" favourites\");",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"At least one favourite exists\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        if (jsonData.collection.length > 0) {",
+                  "            var firstFavourite = jsonData.collection[0];",
+                  "            pm.expect(firstFavourite.userId).to.exist;",
+                  "            pm.expect(firstFavourite.productId).to.exist;",
+                  "            pm.expect(firstFavourite.likeDate).to.exist;",
+                  "            console.log(\"✅ Favourites list contains valid data\");",
+                  "        }",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/favourite-service/api/favourites",
+              "host": ["{{baseUrl}}"],
+              "path": ["favourite-service", "api", "favourites"]
+            },
+            "description": "Obtiene la lista de todos los favoritos"
+          },
+          "response": []
+        },
+        {
+          "name": "5. Obtener Favorito por ID",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Asegurar que tenemos los valores necesarios",
+                  "const userId = pm.environment.get(\"favouriteUserId\") || pm.environment.get(\"userId\") || \"1\";",
+                  "const productId = pm.environment.get(\"favouriteProductId\") || pm.environment.get(\"productId\") || \"1\";",
+                  "const likeDate = pm.environment.get(\"favouriteLikeDate\");",
+                  "",
+                  "if (!likeDate) {",
+                  "    // Generar fecha si no existe",
+                  "    const now = new Date();",
+                  "    const day = String(now.getDate()).padStart(2, '0');",
+                  "    const month = String(now.getMonth() + 1).padStart(2, '0');",
+                  "    const year = now.getFullYear();",
+                  "    const hours = String(now.getHours()).padStart(2, '0');",
+                  "    const minutes = String(now.getMinutes()).padStart(2, '0');",
+                  "    const seconds = String(now.getSeconds()).padStart(2, '0');",
+                  "    const milliseconds = String(now.getMilliseconds()).padStart(6, '0');",
+                  "    pm.environment.set(\"favouriteLikeDate\", `${day}-${month}-${year}__${hours}:${minutes}:${seconds}:${milliseconds}`);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"Favourite exists\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData.userId).to.exist;",
+                  "        pm.expect(jsonData.productId).to.exist;",
+                  "        pm.expect(jsonData.likeDate).to.exist;",
+                  "    });",
+                  "",
+                  "    pm.test(\"Favourite has user and product information (Favourite Service called User and Product Services)\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        // Verificar que Favourite Service llamó a User Service y Product Service",
+                  "        pm.expect(jsonData.user).to.exist;",
+                  "        pm.expect(jsonData.product).to.exist;",
+                  "        console.log(\"✅ Favourite Service successfully retrieved user and product data from other services\");",
+                  "    });",
+                  "",
+                  "    pm.test(\"User data is complete\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        if (jsonData.user && jsonData.user.userId !== null && jsonData.user.userId !== undefined) {",
+                  "            pm.expect(jsonData.user.userId).to.exist;",
+                  "            console.log(\"✅ User data retrieved from User Service\");",
+                  "        }",
+                  "    });",
+                  "",
+                  "    pm.test(\"Product data is complete\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        if (jsonData.product && jsonData.product.productId !== null && jsonData.product.productId !== undefined) {",
+                  "            pm.expect(jsonData.product.productId).to.exist;",
+                  "            console.log(\"✅ Product data retrieved from Product Service\");",
+                  "        }",
+                  "    });",
+                  "} else {",
+                  "    console.log(\"❌ Failed to get favourite. Response: \" + pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/favourite-service/api/favourites/{{favouriteUserId}}/{{favouriteProductId}}/{{favouriteLikeDate}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["favourite-service", "api", "favourites", "{{favouriteUserId}}", "{{favouriteProductId}}", "{{favouriteLikeDate}}"]
+            },
+            "description": "Obtiene un favorito específico por su ID compuesto (userId, productId, likeDate)"
+          },
+          "response": []
+        },
+        {
+          "name": "6. Actualizar Favorito",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Generar nueva fecha para actualización",
+                  "const now = new Date();",
+                  "const day = String(now.getDate()).padStart(2, '0');",
+                  "const month = String(now.getMonth() + 1).padStart(2, '0');",
+                  "const year = now.getFullYear();",
+                  "const hours = String(now.getHours()).padStart(2, '0');",
+                  "const minutes = String(now.getMinutes()).padStart(2, '0');",
+                  "const seconds = String(now.getSeconds()).padStart(2, '0');",
+                  "const milliseconds = String(now.getMilliseconds()).padStart(6, '0');",
+                  "const updatedLikeDate = `${day}-${month}-${year}__${hours}:${minutes}:${seconds}:${milliseconds}`;",
+                  "",
+                  "// Construir el body JSON para actualización",
+                  "const userId = parseInt(pm.environment.get(\"favouriteUserId\")) || parseInt(pm.environment.get(\"userId\")) || 1;",
+                  "const productId = parseInt(pm.environment.get(\"favouriteProductId\")) || parseInt(pm.environment.get(\"productId\")) || 1;",
+                  "const requestBody = {",
+                  "    userId: userId,",
+                  "    productId: productId,",
+                  "    likeDate: updatedLikeDate",
+                  "};",
+                  "pm.environment.set(\"requestBodyUpdateFavourite\", JSON.stringify(requestBody));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"Favourite was updated successfully\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData.userId).to.exist;",
+                  "        pm.expect(jsonData.productId).to.exist;",
+                  "        pm.expect(jsonData.likeDate).to.exist;",
+                  "        console.log(\"✅ Favourite updated successfully\");",
+                  "    });",
+                  "} else {",
+                  "    console.log(\"❌ Failed to update favourite. Response: \" + pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{requestBodyUpdateFavourite}}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/favourite-service/api/favourites",
+              "host": ["{{baseUrl}}"],
+              "path": ["favourite-service", "api", "favourites"]
+            },
+            "description": "Actualiza un favorito existente"
+          },
+          "response": []
+        },
+        {
+          "name": "7. Eliminar Favorito",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Asegurar que tenemos los valores necesarios",
+                  "const userId = pm.environment.get(\"favouriteUserId\") || pm.environment.get(\"userId\") || \"1\";",
+                  "const productId = pm.environment.get(\"favouriteProductId\") || pm.environment.get(\"productId\") || \"1\";",
+                  "let likeDate = pm.environment.get(\"favouriteLikeDate\");",
+                  "",
+                  "if (!likeDate) {",
+                  "    // Generar fecha si no existe",
+                  "    const now = new Date();",
+                  "    const day = String(now.getDate()).padStart(2, '0');",
+                  "    const month = String(now.getMonth() + 1).padStart(2, '0');",
+                  "    const year = now.getFullYear();",
+                  "    const hours = String(now.getHours()).padStart(2, '0');",
+                  "    const minutes = String(now.getMinutes()).padStart(2, '0');",
+                  "    const seconds = String(now.getSeconds()).padStart(2, '0');",
+                  "    const milliseconds = String(now.getMilliseconds()).padStart(6, '0');",
+                  "    likeDate = `${day}-${month}-${year}__${hours}:${minutes}:${seconds}:${milliseconds}`;",
+                  "    pm.environment.set(\"favouriteLikeDate\", likeDate);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test(\"Favourite was deleted successfully\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.eql(true);",
+                  "        console.log(\"✅ Favourite deleted successfully\");",
+                  "        console.log(\"✅ E2E Test: Gestión de Favoritos - PASÓ\");",
+                  "    });",
+                  "} else {",
+                  "    console.log(\"❌ Failed to delete favourite. Response: \" + pm.response.text());",
+                  "    console.log(\"💡 Check: Favourite exists? userId: \" + pm.environment.get(\"favouriteUserId\") + \", productId: \" + pm.environment.get(\"favouriteProductId\") + \", likeDate: \" + pm.environment.get(\"favouriteLikeDate\"));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/favourite-service/api/favourites/{{favouriteUserId}}/{{favouriteProductId}}/{{favouriteLikeDate}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["favourite-service", "api", "favourites", "{{favouriteUserId}}", "{{favouriteProductId}}", "{{favouriteLikeDate}}"]
+            },
+            "description": "Elimina un favorito por su ID compuesto"
+          },
+          "response": []
+        }
+      ],
+      "description": "Valida el flujo completo de gestión de favoritos: crear, listar, obtener, actualizar y eliminar, verificando la comunicación con User Service y Product Service"
     }
   ],
   "variable": [

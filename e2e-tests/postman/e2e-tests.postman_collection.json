@@ -1517,7 +1517,11 @@
                   "    const milliseconds = String(now.getMilliseconds()).padStart(6, '0');",
                   "    likeDate = `${day}-${month}-${year}__${hours}:${minutes}:${seconds}:${milliseconds}`;",
                   "    pm.environment.set(\"favouriteLikeDate\", likeDate);",
-                  "}"
+                  "}",
+                  "",
+                  "// Codificar la fecha para la URL (los dos puntos : necesitan ser %3A)",
+                  "const encodedLikeDate = encodeURIComponent(likeDate);",
+                  "pm.environment.set(\"favouriteLikeDateEncoded\", encodedLikeDate);"
                 ],
                 "type": "text/javascript"
               }

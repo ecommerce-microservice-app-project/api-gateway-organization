@@ -26,3 +26,14 @@ logging:
             jpa: INFO
             orm: INFO
 
+# Configuración Eureka - Usa variables de entorno desde ConfigMap en Kubernetes
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE:http://service-discovery.ecommerce-prod.svc.cluster.local:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: ${EUREKA_INSTANCE_PREFER_IP_ADDRESS:true}
+    hostname: ${EUREKA_INSTANCE_HOSTNAME:api-gateway.ecommerce-prod.svc.cluster.local}
+

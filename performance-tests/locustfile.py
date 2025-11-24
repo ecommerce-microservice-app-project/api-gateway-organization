@@ -70,9 +70,9 @@ class EcommerceUser(HttpUser):
                 data = response.json()
                 if 'collection' in data and len(data['collection']) > 0:
                     self.payment_order_ids = [o['orderId']
-                                               for o in data['collection'][:10]]
+                                              for o in data['collection'][:10]]
                     self.shipping_order_ids = [o['orderId']
-                                                for o in data['collection'][:10]]
+                                               for o in data['collection'][:10]]
 
             # Obtener algunos productos existentes para shipping
             if not self.shipping_product_ids:
@@ -317,10 +317,12 @@ class EcommerceUser(HttpUser):
         # Generar fecha en formato requerido: dd-MM-yyyy__HH:mm:ss:SSSSSS
         # Agregar un pequeño delay aleatorio para evitar colisiones de fecha en requests concurrentes
         import time
-        time.sleep(random.uniform(0.0001, 0.001))  # Delay aleatorio de 0.1-1ms para evitar colisiones
+        # Delay aleatorio de 0.1-1ms para evitar colisiones
+        time.sleep(random.uniform(0.0001, 0.001))
         now = datetime.now()
         # El formato requiere exactamente 6 dígitos de microsegundos
-        like_date = now.strftime("%d-%m-%Y__%H:%M:%S:") + str(now.microsecond).zfill(6)
+        like_date = now.strftime("%d-%m-%Y__%H:%M:%S:") + \
+            str(now.microsecond).zfill(6)
 
         favourite_data = {
             "userId": random.choice(self.favourite_user_ids),
@@ -365,7 +367,7 @@ class EcommerceUser(HttpUser):
                         # URL encode el likeDate para evitar problemas con caracteres especiales
                         from urllib.parse import quote
                         like_date_encoded = quote(str(like_date), safe='')
-                        
+
                         # Hacer request con el ID compuesto
                         with self.client.get(
                             f"/favourite-service/api/favourites/{user_id}/{product_id}/{like_date_encoded}",

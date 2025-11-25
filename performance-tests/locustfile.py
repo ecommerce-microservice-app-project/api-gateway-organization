@@ -25,7 +25,7 @@ class EcommerceUser(HttpUser):
         self.order_id = None
         # self.favourite_user_ids = []  # Comentado: favourite service deshabilitado en tests
         # self.favourite_product_ids = []  # Comentado: favourite service deshabilitado en tests
-        self.payment_order_ids = []  # Para payment service
+        # self.payment_order_ids = []  # Comentado: payment service deshabilitado en tests
         self.shipping_order_ids = []  # Para shipping service
         self.shipping_product_ids = []  # Para shipping service
 
@@ -64,14 +64,14 @@ class EcommerceUser(HttpUser):
             #         self.favourite_user_ids = [u['userId']
             #                                    for u in data['collection'][:10]]
 
-            # Obtener algunas órdenes existentes para payments y shipping
+            # Obtener algunas órdenes existentes para shipping (payment deshabilitado)
             response = self.client.get(
                 "/order-service/api/orders", name="GET Orders List")
             if response.status_code == 200:
                 data = response.json()
                 if 'collection' in data and len(data['collection']) > 0:
-                    self.payment_order_ids = [o['orderId']
-                                              for o in data['collection'][:10]]
+                    # self.payment_order_ids = [o['orderId']
+                    #                           for o in data['collection'][:10]]  # Comentado: payment service deshabilitado
                     self.shipping_order_ids = [o['orderId']
                                                for o in data['collection'][:10]]
 
@@ -292,7 +292,6 @@ class EcommerceUser(HttpUser):
 
     # ==================== FAVOURITE SERVICE ====================
     # COMENTADO: Favourite service deshabilitado en tests de performance
-    # para reducir errores intermitentes y carga en el sistema
 
     # @task(7)  # Peso 7: muy frecuente
     # def list_favourites(self):
@@ -391,76 +390,78 @@ class EcommerceUser(HttpUser):
     #         pass
 
     # ==================== PAYMENT SERVICE ====================
+    # COMENTADO: Payment service deshabilitado en tests de performance
+    # para reducir errores intermitentes y carga en el sistema
 
-    @task(7)  # Peso 7: muy frecuente
-    def list_payments(self):
-        """Listar pagos - operación común"""
-        with self.client.get(
-            "/payment-service/api/payments",
-            name="GET Payments List",
-            catch_response=True
-        ) as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Status code: {response.status_code}")
+    # @task(7)  # Peso 7: muy frecuente
+    # def list_payments(self):
+    #     """Listar pagos - operación común"""
+    #     with self.client.get(
+    #         "/payment-service/api/payments",
+    #         name="GET Payments List",
+    #         catch_response=True
+    #     ) as response:
+    #         if response.status_code == 200:
+    #             response.success()
+    #         else:
+    #             response.failure(f"Status code: {response.status_code}")
 
-    @task(4)  # Peso 4: frecuente
-    def create_payment(self):
-        """Crear nuevo pago"""
-        if not self.payment_order_ids:
-            return
+    # @task(4)  # Peso 4: frecuente
+    # def create_payment(self):
+    #     """Crear nuevo pago"""
+    #     if not self.payment_order_ids:
+    #         return
 
-        payment_data = {
-            "isPayed": False,
-            "paymentStatus": "NOT_STARTED",
-            "order": {
-                "orderId": random.choice(self.payment_order_ids)
-            }
-        }
+    #     payment_data = {
+    #         "isPayed": False,
+    #         "paymentStatus": "NOT_STARTED",
+    #         "order": {
+    #             "orderId": random.choice(self.payment_order_ids)
+    #         }
+    #     }
 
-        with self.client.post(
-            "/payment-service/api/payments",
-            json=payment_data,
-            name="POST Create Payment",
-            catch_response=True
-        ) as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Status code: {response.status_code}")
+    #     with self.client.post(
+    #         "/payment-service/api/payments",
+    #         json=payment_data,
+    #         name="POST Create Payment",
+    #         catch_response=True
+    #     ) as response:
+    #         if response.status_code == 200:
+    #             response.success()
+    #         else:
+    #             response.failure(f"Status code: {response.status_code}")
 
-    @task(3)  # Peso 3: moderado
-    def get_payment_by_id(self):
-        """Obtener pago por ID"""
-        # Para obtener un pago necesitamos paymentId
-        # Intentamos obtener uno de la lista primero
-        try:
-            response = self.client.get(
-                "/payment-service/api/payments",
-                name="GET Payments List (for ID)"
-            )
-            if response.status_code == 200:
-                data = response.json()
-                if 'collection' in data and len(data['collection']) > 0:
-                    payment = random.choice(data['collection'])
-                    payment_id = payment.get('paymentId')
+    # @task(3)  # Peso 3: moderado
+    # def get_payment_by_id(self):
+    #     """Obtener pago por ID"""
+    #     # Para obtener un pago necesitamos paymentId
+    #     # Intentamos obtener uno de la lista primero
+    #     try:
+    #         response = self.client.get(
+    #             "/payment-service/api/payments",
+    #             name="GET Payments List (for ID)"
+    #         )
+    #         if response.status_code == 200:
+    #             data = response.json()
+    #             if 'collection' in data and len(data['collection']) > 0:
+    #                 payment = random.choice(data['collection'])
+    #                 payment_id = payment.get('paymentId')
 
-                    if payment_id:
-                        # Hacer request con el ID
-                        with self.client.get(
-                            f"/payment-service/api/payments/{payment_id}",
-                            name="GET Payment by ID",
-                            catch_response=True
-                        ) as pay_response:
-                            if pay_response.status_code == 200:
-                                pay_response.success()
-                            else:
-                                pay_response.failure(
-                                    f"Status code: {pay_response.status_code}")
-        except Exception as e:
-            # Si falla, simplemente retornar sin hacer nada
-            pass
+    #                 if payment_id:
+    #                     # Hacer request con el ID
+    #                     with self.client.get(
+    #                         f"/payment-service/api/payments/{payment_id}",
+    #                         name="GET Payment by ID",
+    #                         catch_response=True
+    #                     ) as pay_response:
+    #                         if pay_response.status_code == 200:
+    #                             pay_response.success()
+    #                         else:
+    #                             pay_response.failure(
+    #                                 f"Status code: {pay_response.status_code}")
+    #     except Exception as e:
+    #         # Si falla, simplemente retornar sin hacer nada
+    #         pass
 
     # ==================== SHIPPING SERVICE ====================
 

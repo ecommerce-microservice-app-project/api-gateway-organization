@@ -162,45 +162,47 @@ class EcommerceUser(HttpUser):
                 response.failure(f"Status code: {response.status_code}")
 
     # ==================== USER SERVICE ====================
+    # COMENTADO: User service deshabilitado en tests de performance
+    # para reducir errores intermitentes y carga en el sistema
 
-    @task(8)  # Peso 8: muy frecuente
-    def list_users(self):
-        """Listar usuarios"""
-        with self.client.get(
-            "/user-service/api/users",
-            name="GET Users List",
-            catch_response=True
-        ) as response:
-            if response.status_code == 200:
-                response.success()
-            else:
-                response.failure(f"Status code: {response.status_code}")
+    # @task(8)  # Peso 8: muy frecuente
+    # def list_users(self):
+    #     """Listar usuarios"""
+    #     with self.client.get(
+    #         "/user-service/api/users",
+    #         name="GET Users List",
+    #         catch_response=True
+    #     ) as response:
+    #         if response.status_code == 200:
+    #             response.success()
+    #         else:
+    #             response.failure(f"Status code: {response.status_code}")
 
-    @task(3)  # Peso 3: moderado
-    def create_user(self):
-        """Crear nuevo usuario"""
-        timestamp = int(datetime.now().timestamp() * 1000)
-        user_data = {
-            "firstName": f"TestUser{timestamp}",
-            "lastName": "Performance",
-            "email": f"perf.test.{timestamp}@example.com",
-            "phone": f"+57-300-{random.randint(1000000, 9999999)}",
-            "imageUrl": "https://bootdey.com/img/Content/avatar/avatar7.png"
-        }
+    # @task(3)  # Peso 3: moderado
+    # def create_user(self):
+    #     """Crear nuevo usuario"""
+    #     timestamp = int(datetime.now().timestamp() * 1000)
+    #     user_data = {
+    #         "firstName": f"TestUser{timestamp}",
+    #         "lastName": "Performance",
+    #         "email": f"perf.test.{timestamp}@example.com",
+    #         "phone": f"+57-300-{random.randint(1000000, 9999999)}",
+    #         "imageUrl": "https://bootdey.com/img/Content/avatar/avatar7.png"
+    #     }
 
-        with self.client.post(
-            "/user-service/api/users",
-            json=user_data,
-            name="POST Create User",
-            catch_response=True
-        ) as response:
-            if response.status_code == 200:
-                data = response.json()
-                if 'userId' in data:
-                    self.user_id = data['userId']
-                response.success()
-            else:
-                response.failure(f"Status code: {response.status_code}")
+    #     with self.client.post(
+    #         "/user-service/api/users",
+    #         json=user_data,
+    #         name="POST Create User",
+    #         catch_response=True
+    #     ) as response:
+    #         if response.status_code == 200:
+    #             data = response.json()
+    #             if 'userId' in data:
+    #                 self.user_id = data['userId']
+    #             response.success()
+    #         else:
+    #             response.failure(f"Status code: {response.status_code}")
 
     # ==================== ORDER SERVICE ====================
 

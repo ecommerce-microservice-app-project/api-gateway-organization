@@ -261,20 +261,20 @@ jobs:
         kubectl apply -f configmap.tmp.yaml
         
         # Change service to LoadBalancer for stage with static IP (no Ingress in stage)
-        # Use loadBalancerIP to assign specific IP: 130.213.254.34
-        kubectl patch svc api-gateway -n ${{ env.KUBERNETES_NAMESPACE }} -p '{"spec":{"type":"LoadBalancer","loadBalancerIP":"130.213.254.34"}}' || true
+        # Static IP: 52.167.161.77 (created in MC_az-k8s-stage-rg_az-k8s-stage-cluster_eastus2)
+        kubectl patch svc api-gateway -n ${{ env.KUBERNETES_NAMESPACE }} -p '{"spec":{"type":"LoadBalancer","loadBalancerIP":"52.167.161.77"}}' || true
         
         # Wait for LoadBalancer IP assignment
-        echo "Waiting for LoadBalancer IP assignment (130.213.254.34)..."
+        echo "Waiting for LoadBalancer IP assignment (52.167.161.77)..."
         timeout=120
         while [ $timeout -gt 0 ]; do
           IP=$(kubectl get svc api-gateway -n ${{ env.KUBERNETES_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
           if [ -n "$IP" ]; then
             echo "✅ LoadBalancer IP assigned: $IP"
-            if [ "$IP" = "130.213.254.34" ]; then
-              echo "✅ Correct IP assigned for stage: http://130.213.254.34:8080"
+            if [ "$IP" = "52.167.161.77" ]; then
+              echo "✅ Correct static IP assigned for stage: http://52.167.161.77:8080"
             else
-              echo "⚠️  Warning: Expected 130.213.254.34 but got $IP"
+              echo "⚠️  Warning: Expected 52.167.161.77 but got $IP"
             fi
             break
           fi

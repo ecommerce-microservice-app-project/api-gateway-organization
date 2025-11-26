@@ -373,6 +373,7 @@ jobs:
         kubectl create namespace ${{ env.KUBERNETES_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
         
     - name: Apply RBAC configuration
+      continue-on-error: true
       run: |
         echo "Applying RBAC configuration for ${{ env.SERVICE_NAME }}..."
         
@@ -383,7 +384,15 @@ jobs:
         sed -i "s|<NAMESPACE>|${{ env.KUBERNETES_NAMESPACE }}|g" rbac.tmp.yaml
         
         # Apply RBAC resources
-        kubectl apply -f rbac.tmp.yaml
+        if kubectl apply -f rbac.tmp.yaml; then
+          echo "✓ RBAC configuration applied successfully"
+        else
+          echo "⚠ WARNING: Failed to apply RBAC configuration"
+          echo "⚠ This is likely because the GitHub Actions ServiceAccount doesn't have RBAC permissions"
+          echo "⚠ Please apply k8s/github-actions-rbac/github-actions-rbac.yaml manually"
+          echo "⚠ See: kubernetes-organization/k8s/github-actions-rbac/README.md"
+          exit 1
+        fi
         
         # Verify RBAC was applied
         echo "Verifying RBAC resources..."

@@ -227,28 +227,10 @@ class EcommerceUser(HttpUser):
         # 2. Carrito
         # 3. Orden
 
+        # COMENTADO: User service deshabilitado en tests de performance
+        # Si no hay user_id, no se puede crear orden (user-service está deshabilitado)
         if not self.user_id:
-            # Intentar crear usuario primero
-            timestamp = int(datetime.now().timestamp() * 1000)
-            user_data = {
-                "firstName": f"OrderUser{timestamp}",
-                "lastName": "Test",
-                "email": f"order.user.{timestamp}@example.com",
-                "phone": f"+57-300-{random.randint(1000000, 9999999)}",
-                "imageUrl": "https://bootdey.com/img/Content/avatar/avatar7.png"
-            }
-
-            user_response = self.client.post(
-                "/user-service/api/users",
-                json=user_data,
-                name="POST Create User (for Order)"
-            )
-
-            if user_response.status_code != 200:
-                return
-
-            user_data = user_response.json()
-            self.user_id = user_data.get('userId')
+            return
 
         # Crear carrito
         cart_data = {"userId": self.user_id}

@@ -1,5 +1,5 @@
 # Pruebas E2E (End-to-End) - Ecommerce Microservices
-
+.
 ## 📋 Descripción
 
 Este directorio contiene las pruebas E2E que validan flujos completos de usuario a través de múltiples microservicios. Las pruebas están diseñadas para ejecutarse en el ambiente Stage usando Postman y Newman.

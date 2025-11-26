@@ -474,7 +474,6 @@ jobs:
       
     - name: OWASP ZAP Baseline Scan
       uses: zaproxy/action-baseline@v0.10.0
-      continue-on-error: true
       with:
         target: 'https://api.alianzadelamagiaeterna.com'
         rules_file_name: '.zap/rules.tsv'
@@ -493,7 +492,7 @@ jobs:
 
   release-notes:
     name: Generate Release Notes
-    needs: [calculate-version, deploy]
+    needs: [calculate-version, deploy, security-test-owasp]
     runs-on: ubuntu-latest
     if: |
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&

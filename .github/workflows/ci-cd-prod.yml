@@ -484,12 +484,28 @@ jobs:
       
     - name: OWASP ZAP Baseline Scan
       id: zap-scan
-      uses: zaproxy/action-baseline@v0.10.0
-      continue-on-error: true
-      with:
-        target: 'https://api.alianzadelamagiaeterna.com'
-        rules_file_name: '.zap/rules.tsv'
-        cmd_options: '-a'
+      run: |
+        echo "=== Iniciando escaneo OWASP ZAP ==="
+        
+        # Ejecutar ZAP directamente con Docker para evitar problemas de permisos del action
+        docker run --rm \
+          -v "${{ github.workspace }}:/zap/wrk/:rw" \
+          -t ghcr.io/zaproxy/zaproxy:stable \
+          zap-baseline.py \
+          -t https://api.alianzadelamagiaeterna.com \
+          -J report_json.json \
+          -w report_md.md \
+          -r report_html.html \
+          -a || true
+        
+        # Verificar que los reportes se generaron
+        if [ -f report_json.json ] && [ -s report_json.json ]; then
+          echo "✓ Reportes generados exitosamente"
+          echo "scan_success=true" >> $GITHUB_OUTPUT
+        else
+          echo "⚠ No se generaron reportes"
+          echo "scan_success=false" >> $GITHUB_OUTPUT
+        fi
         
     - name: Verify OWASP ZAP Scan Results
       if: always()
@@ -516,15 +532,6 @@ jobs:
             echo "✅ No se encontraron vulnerabilidades críticas"
             echo "✅ Solo hay hallazgos informativos (riskcode 0)"
             echo "✅ El escaneo se completó correctamente"
-            
-            # Si el step anterior falló, fue por permisos, no por vulnerabilidades
-            if [ "${{ steps.zap-scan.outcome }}" == "failure" ]; then
-              echo ""
-              echo "ℹ️  NOTA: El action mostró un error de permisos al final,"
-              echo "   pero el escaneo se completó exitosamente."
-              echo "   Esto es normal y no afecta los resultados del escaneo."
-            fi
-            
             echo ""
             echo "✅ Pipeline continuará normalmente"
             exit 0

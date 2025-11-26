@@ -484,21 +484,12 @@ jobs:
       
     - name: OWASP ZAP Baseline Scan
       id: zap-scan
-      run: |
-        # Ejecutar OWASP ZAP y capturar el exit code
-        set +e  # No fallar en errores
-        zaproxy/action-baseline@v0.10.0/entrypoint.sh || ZAP_EXIT_CODE=$?
-        set -e  # Volver a fallar en errores
-        
-        # Guardar el exit code para verificación posterior
-        echo "ZAP_EXIT_CODE=${ZAP_EXIT_CODE:-0}" >> $GITHUB_ENV
-        
-        # El step siempre pasa (continue-on-error implícito)
-        exit 0
-      env:
-        INPUT_TARGET: 'https://api.alianzadelamagiaeterna.com'
-        INPUT_RULES_FILE_NAME: '.zap/rules.tsv'
-        INPUT_CMD_OPTIONS: '-a'
+      uses: zaproxy/action-baseline@v0.10.0
+      continue-on-error: true
+      with:
+        target: 'https://api.alianzadelamagiaeterna.com'
+        rules_file_name: '.zap/rules.tsv'
+        cmd_options: '-a'
         
     - name: Verify OWASP ZAP Scan Results
       if: always()
@@ -556,15 +547,17 @@ jobs:
         fi
         
     - name: Upload OWASP ZAP Report
-      uses: actions/upload-artifact@v4
       if: always()
+      uses: actions/upload-artifact@v4
+      continue-on-error: true
       with:
         name: owasp-zap-report-prod
         path: |
           report_html.html
           report_json.json
+          report_md.md
         retention-days: 30
-        if-no-files-found: warn
+        if-no-files-found: ignore
 
   release-notes:
     name: Generate Release Notes

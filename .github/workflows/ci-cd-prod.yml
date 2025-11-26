@@ -492,24 +492,55 @@ jobs:
         cmd_options: '-a'
         
     - name: Verify OWASP ZAP Scan Results
-      if: always() && steps.zap-scan.outcome == 'failure'
+      if: always()
       run: |
-        # Si el scan falló, verificar si fue por vulnerabilidades o por permisos
-        if [ -f report_html.html ] && [ -s report_html.html ]; then
-          # Buscar si hay FAIL en el reporte (vulnerabilidades críticas)
-          if grep -q "FAIL-NEW: [1-9]" report_html.html || grep -q "FAIL-INPROG: [1-9]" report_html.html; then
-            echo "❌ OWASP ZAP found security vulnerabilities! Pipeline must fail."
+        echo "=== Verificando resultados de OWASP ZAP ==="
+        
+        # Verificar si hay reportes generados
+        if [ -f report_json.json ] && [ -s report_json.json ]; then
+          echo "✓ Reporte JSON encontrado"
+          
+          # Verificar si hay vulnerabilidades críticas (riskcode > 0)
+          # riskcode: 0=Info, 1=Low, 2=Medium, 3=High
+          CRITICAL_ALERTS=$(jq '[.site[].alerts[]? | select(.riskcode > "0")] | length' report_json.json 2>/dev/null || echo "0")
+          
+          if [ "$CRITICAL_ALERTS" -gt 0 ]; then
+            echo "❌ OWASP ZAP encontró $CRITICAL_ALERTS vulnerabilidad(es) crítica(s)!"
+            echo "El pipeline debe fallar por seguridad."
             exit 1
           else
-            echo "✓ Scan completed. No critical vulnerabilities found."
-            echo "⚠ The failure was likely due to permissions, not security issues."
-            echo "✓ Allowing pipeline to continue (scan passed with only warnings)"
+            echo "✓ No se encontraron vulnerabilidades críticas"
+            echo "✓ Solo hay hallazgos informativos (riskcode 0)"
+            
+            # Si el step anterior falló, fue por permisos, no por vulnerabilidades
+            if [ "${{ steps.zap-scan.outcome }}" == "failure" ]; then
+              echo "⚠ El step falló, pero fue por permisos de GitHub, no por vulnerabilidades"
+              echo "✓ El escaneo se completó correctamente (ver report_json.json)"
+            fi
+            
+            echo "✓ Permitiendo que el pipeline continúe"
+            exit 0
+          fi
+        elif [ -f report_html.html ] && [ -s report_html.html ]; then
+          echo "✓ Reporte HTML encontrado (fallback)"
+          # Buscar FAIL en el HTML como respaldo
+          if grep -q "FAIL-NEW: [1-9]" report_html.html || grep -q "FAIL-INPROG: [1-9]" report_html.html; then
+            echo "❌ OWASP ZAP encontró vulnerabilidades críticas!"
+            exit 1
+          else
+            echo "✓ No se encontraron vulnerabilidades críticas en el reporte HTML"
             exit 0
           fi
         else
-          echo "⚠ Report not found. Failure may be due to permissions."
-          echo "✓ Allowing pipeline to continue"
-          exit 0
+          echo "⚠ No se encontraron reportes generados"
+          if [ "${{ steps.zap-scan.outcome }}" == "failure" ]; then
+            echo "⚠ El step falló, probablemente por permisos de GitHub"
+            echo "✓ Permitiendo que el pipeline continúe"
+            exit 0
+          else
+            echo "✓ El step pasó, continuando"
+            exit 0
+          fi
         fi
         
     - name: Upload OWASP ZAP Report

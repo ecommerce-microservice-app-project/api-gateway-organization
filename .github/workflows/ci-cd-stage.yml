@@ -233,6 +233,28 @@ jobs:
       run: |
         kubectl create namespace ${{ env.KUBERNETES_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
         
+    - name: Apply RBAC configuration
+      run: |
+        echo "Applying RBAC configuration for ${{ env.SERVICE_NAME }}..."
+        
+        # Create temporary RBAC file from infra repo
+        cp infra/k8s/api-gateway/rbac.yaml rbac.tmp.yaml
+        
+        # Replace namespace placeholder
+        sed -i "s|<NAMESPACE>|${{ env.KUBERNETES_NAMESPACE }}|g" rbac.tmp.yaml
+        
+        # Apply RBAC resources
+        kubectl apply -f rbac.tmp.yaml
+        
+        # Verify RBAC was applied
+        echo "Verifying RBAC resources..."
+        kubectl get serviceaccount api-gateway-sa -n ${{ env.KUBERNETES_NAMESPACE }} || echo "ServiceAccount not found"
+        kubectl get role api-gateway-role -n ${{ env.KUBERNETES_NAMESPACE }} || echo "Role not found"
+        kubectl get rolebinding api-gateway-rolebinding -n ${{ env.KUBERNETES_NAMESPACE }} || echo "RoleBinding not found"
+        
+        # Cleanup
+        rm rbac.tmp.yaml
+        
     - name: Deploy to Kubernetes
       run: |
         IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
@@ -279,4 +301,37 @@ jobs:
         echo ""
         echo "=== Deployment Status ==="
         kubectl get deployment ${{ env.SERVICE_NAME }} -n ${{ env.KUBERNETES_NAMESPACE }}
+        
+  security-test-owasp:
+    name: OWASP ZAP Security Test
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    
+    permissions:
+      contents: read
+      security-events: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: OWASP ZAP Baseline Scan
+      uses: zaproxy/action-baseline@v0.10.0
+      continue-on-error: true
+      with:
+        target: 'http://130.213.254.34:8080'
+        rules_file_name: '.zap/rules.tsv'
+        cmd_options: '-a'
+        
+    - name: Upload OWASP ZAP Report
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: owasp-zap-report-stage
+        path: |
+          report_html.html
+          report_json.json
+        retention-days: 30
+        if-no-files-found: warn
 

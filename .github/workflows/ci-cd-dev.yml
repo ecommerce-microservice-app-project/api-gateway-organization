@@ -252,6 +252,28 @@ jobs:
       run: |
         kubectl create namespace ${{ env.KUBERNETES_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
         
+    - name: Apply RBAC configuration
+      run: |
+        echo "Applying RBAC configuration for ${{ env.SERVICE_NAME }}..."
+        
+        # Create temporary RBAC file from infra repo
+        cp infra/k8s/api-gateway/rbac.yaml rbac.tmp.yaml
+        
+        # Replace namespace placeholder
+        sed -i "s|<NAMESPACE>|${{ env.KUBERNETES_NAMESPACE }}|g" rbac.tmp.yaml
+        
+        # Apply RBAC resources
+        kubectl apply -f rbac.tmp.yaml
+        
+        # Verify RBAC was applied
+        echo "Verifying RBAC resources..."
+        kubectl get serviceaccount api-gateway-sa -n ${{ env.KUBERNETES_NAMESPACE }} || echo "ServiceAccount not found"
+        kubectl get role api-gateway-role -n ${{ env.KUBERNETES_NAMESPACE }} || echo "Role not found"
+        kubectl get rolebinding api-gateway-rolebinding -n ${{ env.KUBERNETES_NAMESPACE }} || echo "RoleBinding not found"
+        
+        # Cleanup
+        rm rbac.tmp.yaml
+        
     - name: Deploy to Kubernetes
       run: |
         IMAGE_NAME="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.env.outputs.IMAGE_TAG }}"

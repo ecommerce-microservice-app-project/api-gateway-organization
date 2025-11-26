@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 
 # Base URL del API Gateway (se configurará desde variable de entorno o CLI)
-HOST = "http://52.167.161.77:8080"
+HOST = "http://68.154.28.85:8080"
 
 
 class EcommerceUser(HttpUser):

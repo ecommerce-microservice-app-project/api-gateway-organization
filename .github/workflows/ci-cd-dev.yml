@@ -277,6 +277,29 @@ jobs:
         kubectl apply -f deployment.tmp.yaml
         kubectl apply -f configmap.tmp.yaml
         
+        # Change service to LoadBalancer for dev with static IP (no Ingress in dev)
+        # Static IP: 68.154.28.85 (created in MC_az-k8s-rg_az-k8s-cluster_eastus2)
+        kubectl patch svc api-gateway -n ${{ env.KUBERNETES_NAMESPACE }} -p '{"spec":{"type":"LoadBalancer","loadBalancerIP":"68.154.28.85"}}' || true
+        
+        # Wait for LoadBalancer IP assignment
+        echo "Waiting for LoadBalancer IP assignment (68.154.28.85)..."
+        timeout=120
+        while [ $timeout -gt 0 ]; do
+          IP=$(kubectl get svc api-gateway -n ${{ env.KUBERNETES_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+          if [ -n "$IP" ]; then
+            echo "✅ LoadBalancer IP assigned: $IP"
+            if [ "$IP" = "68.154.28.85" ]; then
+              echo "✅ Correct static IP assigned for dev: http://68.154.28.85:8080"
+            else
+              echo "⚠️  Warning: Expected 68.154.28.85 but got $IP"
+            fi
+            break
+          fi
+          echo "Waiting for IP assignment... ($timeout seconds remaining)"
+          sleep 5
+          timeout=$((timeout-5))
+        done
+        
         # Cleanup
         rm deployment.tmp.yaml configmap.tmp.yaml
         
